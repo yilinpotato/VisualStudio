@@ -17,8 +17,8 @@ from starter.utils import get_device, get_mesh_renderer, load_cow_mesh
 
 def render_cow(
     cow_path, image_size,
-                        color1, color2,
-                        camera_R, camera_T
+    color1, color2,
+    camera_R, camera_T
 ):
     # Get the renderer.
     renderer = get_mesh_renderer(image_size=image_size)
@@ -28,36 +28,33 @@ def render_cow(
 
     # Get the vertices, faces, and textures.
     vertices, faces = load_cow_mesh(cow_path)
-    vertices = vertices.unsqueeze(0)  # (N_v, 3) -> (1, N_v, 3)
-    z = vertices[:,:,2]
-    faces = faces.unsqueeze(0)  # (N_f, 3) -> (1, N_f, 3)
-    textures = torch.ones_like(vertices)  # (1, N_v, 3)
-    textures = textures * torch.tensor(color1)  # (1, N_v, 3)
-    mesh = pytorch3d.structures.Meshes(
-        verts=vertices,
-        faces=faces,
-        textures=pytorch3d.renderer.TexturesVertex(textures),
-    )
-    mesh = mesh.to(device)
-    z_min = torch.min(vertices[0,:,2])
-    z_max = torch.max(vertices[0,:,2])
-    color1 = torch.tensor(color1).view(1,3)
-    color2 = torch.tensor(color2).view(1,3)
+    vertices = vertices.unsqueeze(0).to(device)  # Move to device (N_v, 3) -> (1, N_v, 3)
+    z = vertices[:, :, 2]  # Extract z-coordinates
+    faces = faces.unsqueeze(0).to(device)  # Move to device (N_f, 3) -> (1, N_f, 3)
 
-    alpha = (z - z_min) / (z_max - z_min)
-    var_color = torch.matmul(alpha.view(2930,1), color2) + torch.matmul(1 - alpha.view(2930,1), color1)
-        # Prepare the camera:
+    # Compute color gradient based on z-coordinates
+    z_min = torch.min(z)
+    z_max = torch.max(z)
+    alpha = (z - z_min) / (z_max - z_min)  # Normalize z to [0, 1]
+    color1 = torch.tensor(color1, device=device).view(1, 1, 3)  # Shape: (1, 1, 3)
+    color2 = torch.tensor(color2, device=device).view(1, 1, 3)  # Shape: (1, 1, 3)
+    var_color = alpha.unsqueeze(-1) * color2 + (1 - alpha.unsqueeze(-1)) * color1  # Shape: (1, N_v, 3)
+
+    # Apply the color gradient as textures
+    textures = pytorch3d.renderer.TexturesVertex(verts_features=var_color)
+    mesh = pytorch3d.structures.Meshes(verts=vertices, faces=faces, textures=textures).to(device)
+
+    # Prepare the camera
     cameras = pytorch3d.renderer.FoVPerspectiveCameras(
-        R=torch.eye(3).unsqueeze(0), T=torch.tensor([[0, 0, 3]]), fov=60, device=device
+        R=camera_R.to(device), T=camera_T.to(device), fov=60, device=device
     )
 
-    # Place a point light in front of the cow.
+    # Place a point light in front of the cow
     lights = pytorch3d.renderer.PointLights(location=[[0, 0, -3]], device=device)
 
+    # Render the image
     rend = renderer(mesh, cameras=cameras, lights=lights)
-    rend = rend.cpu().numpy()[0, ..., :3]  # (B, H, W, 4) -> (H, W, 3)
-    # The .cpu moves the tensor to GPU (if needed).
-    return rend
+    return rend.cpu().numpy()[0, ..., :3]  # (H, W, 3)
 
 
 if __name__ == "__main__":
@@ -67,18 +64,18 @@ if __name__ == "__main__":
     parser.add_argument("--image_size", type=int, default=256)
     args = parser.parse_args()
     n_render = 60
-    color1=[1.0, 0.3, 0.3]
-    color2=[0.3, 0.3, 1.0]
+    color1 = [1.0, 0.3, 0.3]
+    color2 = [0.3, 0.3, 1.0]
 
     my_images = []
-    for i in range(0,n_render):
-        R, T = pytorch3d.renderer.cameras.look_at_view_transform(dist=3, azim=180+360*i/n_render)
-        
+    for i in range(0, n_render):
+        R, T = pytorch3d.renderer.cameras.look_at_view_transform(dist=3, azim=180 + 360 * i / n_render)
+
         image = render_cow(cow_path=args.cow_path, image_size=args.image_size,
-                        color1=color1, color2=color2,
-                        camera_R=R, camera_T=T)
-        
-        my_images.append(numpy.uint8(image[:, :, :]*255))
-        print(i,"/",n_render)
+                           color1=color1, color2=color2,
+                           camera_R=R, camera_T=T)
+
+        my_images.append(numpy.uint8(image[:, :, :] * 255))
+        print(i, "/", n_render)
     imageio.mimwrite("images/my_gif.gif", my_images, fps=15)
     plt.imsave(args.output_path, image)
