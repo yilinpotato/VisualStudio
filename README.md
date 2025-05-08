@@ -1,5 +1,5 @@
 # 16-825 Assignment 1: Rendering Basics with PyTorch3D (Total: 100 Points + 10 Bonus)
-
+测试vscode连通性
 Goals: In this assignment, you will learn the basics of rendering with PyTorch3D,
 explore 3D representations, and practice constructing simple geometry.
 
