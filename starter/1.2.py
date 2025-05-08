@@ -43,7 +43,7 @@ def render_cow_z_colored(cow_path, image_size, color1, color2, camera_R, camera_
 
     # 光照 & 渲染器
     raster_settings = RasterizationSettings(image_size=image_size)
-    lights = PointLights(device=device, location=[[2.0, 2.0, -2.0]])
+    lights = PointLights(device=device, location=[[2.0, 2.0, 2.0]])
     renderer = MeshRenderer(
         rasterizer=MeshRasterizer(cameras=cameras, raster_settings=raster_settings),
         shader=SoftPhongShader(device=device, cameras=cameras, lights=lights),
@@ -58,11 +58,11 @@ def main(args):
     os.makedirs("output", exist_ok=True)
     n_render = 60
 
-    color1 = [0.0, 0.0, 1.0]  # blue (近处)
+    color1 = [0.0, 0.0, 0.5]  # blue (近处)
     color2 = [1.0, 0.0, 0.0]  # red (远处)
 
     # Dolly Zoom 的 FOV 变化（从15到90度）
-    fovs = torch.linspace(15, 90, n_render)
+    fovs = torch.linspace(15, 60, n_render)
     scene_width = 1.0  # 假设场景宽度恒定为 1
 
     my_images = []
