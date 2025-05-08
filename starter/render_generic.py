@@ -19,8 +19,14 @@ from starter.utils import get_device, get_mesh_renderer, get_points_renderer
 
 
 def load_rgbd_data(path="data/rgbd_data.pkl"):
-    with open(path, "rb") as f:
-        data = pickle.load(f)
+    if path.endswith(".pkl"):
+        import pickle
+        with open(path, "rb") as f:
+            data = pickle.load(f)
+    elif path.endswith(".npz"):
+        data = np.load(path)
+    else:
+        raise ValueError("Unsupported file format: {}".format(path))
     return data
 
 
